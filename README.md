@@ -35,7 +35,11 @@ create table files (
   size bigint,
   content_type text,
   uploaded_by uuid references auth.users(id),
-  uploaded_at timestamptz default now()
+  uploaded_at timestamptz default now(),
+  scanned boolean default false,
+  infected boolean default false,
+  scan_output text,
+  scanned_at timestamptz
 );
 ```
 

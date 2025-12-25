@@ -18,6 +18,12 @@ export default async function handler(req, res) {
   // Basic server-side validation
   if (size && size > 10 * 1024 * 1024) return res.status(400).json({ error: 'File too large (max 10 MB)' });
 
+  const ALLOWED_TYPES = [
+    'image/png', 'image/jpeg', 'application/pdf', 'text/plain',
+    'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  ];
+  if (content_type && !ALLOWED_TYPES.includes(content_type)) return res.status(400).json({ error: 'File type not allowed' });
+
   // Ensure subject exists
   const { data: subj, error: subjErr } = await supabaseAdmin.from('subjects').select('id').eq('id', subject_id).maybeSingle();
   if (subjErr) return res.status(500).json({ error: subjErr.message });
@@ -34,15 +40,18 @@ export default async function handler(req, res) {
     const { scanBuffer } = await import('../../lib/virusScanner');
     const result = await scanBuffer(buf);
     if (result.infected) {
+      // record scan result (infected)
+      await supabaseAdmin.from('files').insert([{ subject_id, name, path, size, content_type, uploaded_by: userId, scanned: true, infected: true, scan_output: result.output, scanned_at: new Date() }]);
       return res.status(400).json({ error: 'File infected – upload rejected', details: result.output });
     }
+
+    // record scan result (clean)
+    const { data, error } = await supabaseAdmin.from('files').insert([{ subject_id, name, path, size, content_type, uploaded_by: userId, scanned: true, infected: false, scan_output: result.output, scanned_at: new Date() }]).select();
+    if (error) return res.status(500).json({ error: error.message });
+
+    return res.status(200).json({ data });
   } catch (err) {
     console.error('Error during virus scan', err);
     return res.status(500).json({ error: 'Error scanning file' });
   }
-
-  const { data, error } = await supabaseAdmin.from('files').insert([{ subject_id, name, path, size, content_type, uploaded_by: userId }]).select();
-  if (error) return res.status(500).json({ error: error.message });
-
-  return res.status(200).json({ data });
 }

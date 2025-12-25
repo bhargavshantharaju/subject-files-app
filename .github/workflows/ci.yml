@@ -21,3 +21,18 @@ jobs:
     - name: Run tests with coverage
       run: npm run coverage --silent
 
+  clamav-e2e:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install apt deps (ClamAV)
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clamav clamav-daemon clamav-freshclam
+        sudo freshclam || true
+    - name: Run E2E ClamAV scan test
+      run: |
+        npm ci
+        npm run test:e2e
+
