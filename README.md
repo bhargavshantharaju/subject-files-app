@@ -2,6 +2,9 @@
 
 A simple Next.js app that organizes uploaded files into *subjects* (folders) and uses Supabase for authentication and file storage.
 
+Repository: https://github.com/bhargavshantharaju/subject-files-app
+
+
 ## Features (MVP)
 - Google sign-in (Supabase Auth)
 - Create and list Subjects (folders)

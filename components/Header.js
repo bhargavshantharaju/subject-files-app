@@ -5,19 +5,29 @@ export default function Header() {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    const session = supabase.auth.getSession().then(r => r.data.session);
-    session && session.then(s => setUser(s?.user ?? null));
+    let mounted = true;
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+    async function init() {
+      const { data } = await supabase.auth.getSession();
+      if (!mounted) return;
+      setUser(data?.session?.user ?? null);
+    }
+
+    init();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
+
     return () => {
-      listener?.subscription?.unsubscribe?.();
+      mounted = false;
+      subscription.unsubscribe();
     };
   }, []);
 
   async function signIn() {
-    await supabase.auth.signInWithOAuth({ provider: 'google' });
+    // Redirects to Google OAuth flow and returns to the app
+    await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } });
   }
 
   async function signOut() {
@@ -31,6 +41,7 @@ export default function Header() {
       <div style={{marginLeft:'auto'}}>
         {user ? (
           <>
+            <img src={user.user_metadata?.avatar_url || user?.avatar_url} alt="avatar" style={{width:28,height:28,borderRadius:14,marginRight:8}} />
             <span style={{marginRight:8}}>{user.email}</span>
             <button onClick={signOut}>Sign out</button>
           </>
