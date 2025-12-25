@@ -23,6 +23,24 @@ export default async function handler(req, res) {
   if (subjErr) return res.status(500).json({ error: subjErr.message });
   if (!subj) return res.status(400).json({ error: 'Subject not found' });
 
+  // Download file from storage (service role client) and scan it for viruses
+  try {
+    const { data: downloadData, error: dlErr } = await supabaseAdmin.storage.from('files').download(path);
+    if (dlErr) return res.status(500).json({ error: dlErr.message });
+
+    const buffer = await downloadData.arrayBuffer();
+    const buf = Buffer.from(buffer);
+
+    const { scanBuffer } = await import('../../lib/virusScanner');
+    const result = await scanBuffer(buf);
+    if (result.infected) {
+      return res.status(400).json({ error: 'File infected – upload rejected', details: result.output });
+    }
+  } catch (err) {
+    console.error('Error during virus scan', err);
+    return res.status(500).json({ error: 'Error scanning file' });
+  }
+
   const { data, error } = await supabaseAdmin.from('files').insert([{ subject_id, name, path, size, content_type, uploaded_by: userId }]).select();
   if (error) return res.status(500).json({ error: error.message });
 
