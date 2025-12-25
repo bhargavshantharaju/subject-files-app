@@ -2,6 +2,12 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import Header from '../components/Header';
 
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+const ALLOWED_TYPES = [
+  'image/png', 'image/jpeg', 'application/pdf', 'text/plain',
+  'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+];
+
 export default function Home() {
   const [subjects, setSubjects] = useState([]);
   const [newSubject, setNewSubject] = useState('');
@@ -67,15 +73,28 @@ export default function Home() {
 
     const filePath = `${selectedSubject.name}/${Date.now()}_${file.name}`;
 
+    // validate file client-side
+    if (file.size > MAX_FILE_SIZE) return setMessage('File too large (max 10 MB)');
+    if (!ALLOWED_TYPES.includes(file.type)) return setMessage('File type not allowed');
+
     // upload to the 'files' bucket
     const { error: uploadError } = await supabase.storage.from('files').upload(filePath, file, { upsert: false });
     if (uploadError) return setMessage(uploadError.message);
 
-    // insert metadata
-    const { error: metaError } = await supabase.from('files').insert([{ subject_id: selectedSubject.id, name: file.name, path: filePath, size: file.size, content_type: file.type, uploaded_by: userId }]);
-    if (metaError) return setMessage(metaError.message);
+    // Use server endpoint to record metadata (server will verify auth token)
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    if (!token) return setMessage('Not authenticated');
 
-    setMessage('Uploaded');
+    const res = await fetch('/api/record-file', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ subject_id: selectedSubject.id, name: file.name, path: filePath, size: file.size, content_type: file.type })
+    });
+    const payload = await res.json();
+    if (!res.ok) return setMessage(payload?.error || 'Failed to record file metadata');
+
+    setMessage('Uploaded and recorded');
     setFile(null);
     fetchFiles(selectedSubject.id);
   }

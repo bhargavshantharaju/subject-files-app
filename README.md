@@ -39,6 +39,25 @@ create table files (
 );
 ```
 
+4. Apply Row Level Security (RLS) policies (recommended):
+
+- See `db/policies.sql` for example policies that:
+  - Allow only authenticated users to insert subjects/files (with their user id as owner)
+  - Allow users to delete only their own files/subjects
+  - Allow public select of files/subjects
+
+Run the SQL in `db/policies.sql` in the Supabase SQL editor to enable these policies.
+
+5. Set environment variables in `.env.local`:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+```
+
+Note: **SUPABASE_SERVICE_ROLE_KEY** must be kept secret and only set for server environments (Vercel, Netlify); it's required by server endpoints like `/api/record-file` and `/api/signed-url`.
+
 4. Set environment variables in `.env.local`:
 
 ```
